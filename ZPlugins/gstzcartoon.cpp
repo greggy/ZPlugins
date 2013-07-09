@@ -60,6 +60,7 @@
 #  include <config.h>
 #endif
 
+#include <sys/param.h>
 #include <gst/gst.h>
 #include <gst/video/video.h>
 
@@ -67,6 +68,8 @@
 
 GST_DEBUG_CATEGORY_STATIC (gst_zcartoon_debug);
 #define GST_CAT_DEFAULT gst_zcartoon_debug
+
+#define qMin(a,b) (((a)<(b))?(a):(b))
 
 /* Filter signals and args */
 enum
@@ -88,8 +91,7 @@ enum
 static GstStaticPadTemplate sink_factory = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,    
-	GST_STATIC_CAPS( GST_VIDEO_CAPS_ARGB )
-	
+    GST_STATIC_CAPS( GST_VIDEO_CAPS_BGRA )
     );
 
 static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
@@ -220,6 +222,145 @@ gst_zcartoon_set_caps (GstPad * pad, GstCaps * caps)
   return gst_pad_set_caps (otherpad, caps);
 }
 
+static void
+mytransform (GstBuffer * buf)
+{
+  gint width, height;
+  GstCaps * caps;
+  gint pixelPos;
+  guint8 *data;
+
+  caps = GST_BUFFER_CAPS(buf);
+
+  const GstStructure *str;
+
+  str = gst_caps_get_structure (caps, 0);
+  gst_structure_get_int (str, "width", &width);
+  gst_structure_get_int (str, "height", &height);
+
+  //g_print("Video size %d x %d\n", width, height);
+
+  data = GST_BUFFER_DATA (buf);
+
+  for (int i=0; i<height; i++) {
+    for (int j=0; j<width; j++) {
+      pixelPos = (i + j * height) * 4; // Index of pixel
+      data[pixelPos + 2] = 0; // BGRA format
+    }
+  }
+
+  /* Free the buffer */
+  //gst_buffer_unref (buf);
+}
+
+
+/* Cartoon algorithm
+ * -----------------
+ * Mask radius = radius of pixel neighborhood for intensity comparison
+ * Threshold   = relative intensity difference which will result in darkening
+ * Ramp        = amount of relative intensity difference before total black
+ * Blur radius = mask radius / 3.0
+ *
+ * Algorithm:
+ * For each pixel, calculate pixel intensity value to be: avg (blur radius)
+ * relative diff = pixel intensity / avg (mask radius)
+ * If relative diff < Threshold
+ *   intensity mult = (Ramp - MIN (Ramp, (Threshold - relative diff))) / Ramp
+ *   pixel intensity *= intensity mult
+ */
+
+static void
+zcartoon_transform1 (GstBuffer * buf)
+{
+  gint i_width, i_height;
+  GstCaps * caps;
+  gint m_pixelPos, n_pixelPos;
+  guint8 *data;
+  GstBuffer *o_buf;
+  guint8 *o_data;
+  gint m_mask_radius = 7;
+  gdouble m_threshold = 1.0;
+  gdouble m_ramp = 0.1;
+
+  caps = GST_BUFFER_CAPS(buf);
+
+  const GstStructure *str;
+
+  str = gst_caps_get_structure (caps, 0);
+  gst_structure_get_int (str, "width", &i_width);
+  gst_structure_get_int (str, "height", &i_height);
+
+  //g_print("Video size %d x %d\n", width, height);
+
+  data = GST_BUFFER_DATA (buf);
+
+  // copy buf to o_buf
+  o_buf = gst_buffer_copy (buf);
+  o_data = GST_BUFFER_DATA (o_buf);
+
+  gdouble size = m_mask_radius * m_mask_radius;
+
+  gint center = m_mask_radius / 2 + 1,
+          width = i_width - center,
+          height = i_height - center,
+          top = m_mask_radius / 2;
+
+  for(gint x = center; x < height; ++x){
+    for(gint y = center; y < width; ++y){
+
+      m_pixelPos = (x + y * i_height) * 4; // main pixel
+
+      // get neighbour pixels
+      gint i = 0;
+      gdouble sumR = 0, sumB = 0, sumG = 0;
+      for(gint iX = x-top; i < m_mask_radius; ++i, ++iX){
+
+        gint j = 0;
+        for(gint iY = y-top; j < m_mask_radius; ++j, ++iY){
+
+          n_pixelPos = (iX + iY * i_height) * 4; // neighbour pixel
+          sumR += o_data[n_pixelPos + 2];
+          sumB += o_data[n_pixelPos + 0];
+          sumG += o_data[n_pixelPos + 1];
+          //g_print("x: %d; y: %d; iX: %d; iY: %d; m_pixel: %d; n_pixel: %d\n", x, y, iX, iY, m_pixelPos, n_pixelPos);
+        }
+      }
+
+      sumR /= size;
+      sumB /= size;
+      sumG /= size; 
+
+      gdouble red = o_data[m_pixelPos + 2],
+              blue = o_data[m_pixelPos + 0],
+              green = o_data[m_pixelPos + 1];
+      //g_print("red: %f, blue: %f, green: %f; pixel: %d\n", red, blue, green, m_pixelPos);
+
+      gdouble koeffR = red / sumR,
+              koeffB = blue / sumB,
+              koeffG = green / sumG;
+
+      if(koeffR < m_threshold)
+          red *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffR)))/m_ramp);
+
+      if(koeffB < m_threshold)
+          blue *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffB)))/m_ramp);
+
+      if(koeffG < m_threshold)
+          green *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffG)))/m_ramp);
+
+      //g_print("red: %f, blue: %f, green: %f;\n", red, blue, green);
+      data[m_pixelPos + 2] = red;
+      data[m_pixelPos + 0] = blue;
+      data[m_pixelPos + 1] = green;
+
+    }
+  }
+
+  /* Free the buffer */
+  //gst_buffer_unref (buf);
+  //gst_buffer_unref (o_buf);
+}
+
 /* chain function
  * this function does the actual processing
  */
@@ -231,7 +372,9 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
   filter = GST_ZCARTOON (GST_OBJECT_PARENT (pad));
 
   if (filter->silent == FALSE)
-    g_print ("I'm plugged, therefore I'm in.\n");
+    //g_print ("I'm plugged, therefore I'm in.\n");
+    //mytransform (buf);
+    zcartoon_transform1 (buf);
 
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (filter->srcpad, buf);
