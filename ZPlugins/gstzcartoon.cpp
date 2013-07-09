@@ -305,10 +305,10 @@ zcartoon_transform1 (GstBuffer * buf)
           height = i_height - center,
           top = m_mask_radius / 2;
 
-  for(gint x = center; x < height; ++x){
-    for(gint y = center; y < width; ++y){
+  for(gint y = center; y < height; y++){
+    for(gint x = center; x < width; x++){
 
-      m_pixelPos = (x + y * i_height) * 4; // main pixel
+      m_pixelPos = (y * i_height + x) * 4; // main pixel
 
       // get neighbour pixels
       gint i = 0;
@@ -318,7 +318,7 @@ zcartoon_transform1 (GstBuffer * buf)
         gint j = 0;
         for(gint iY = y-top; j < m_mask_radius; ++j, ++iY){
 
-          n_pixelPos = (iX + iY * i_height) * 4; // neighbour pixel
+          n_pixelPos = (iY * i_height + iX) * 4; // neighbour pixel
           sumR += o_data[n_pixelPos + 2];
           sumB += o_data[n_pixelPos + 0];
           sumG += o_data[n_pixelPos + 1];
@@ -348,7 +348,9 @@ zcartoon_transform1 (GstBuffer * buf)
       if(koeffG < m_threshold)
           green *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffG)))/m_ramp);
 
-      //g_print("red: %f, blue: %f, green: %f;\n", red, blue, green);
+      if (red > 255 || blue > 255 || green > 255)
+          g_print("red: %f, blue: %f, green: %f;\n", red, blue, green);
+
       data[m_pixelPos + 2] = red;
       data[m_pixelPos + 0] = blue;
       data[m_pixelPos + 1] = green;
