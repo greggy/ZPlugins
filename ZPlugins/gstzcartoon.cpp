@@ -308,7 +308,7 @@ zcartoon_transform1 (GstBuffer * buf)
   for(gint y = center; y < height; y++){
     for(gint x = center; x < width; x++){
 
-      m_pixelPos = (y * i_height + x) * 4; // main pixel
+      m_pixelPos = (y * i_width + x) * 4; // main pixel
 
       // get neighbour pixels
       gint i = 0;
@@ -318,7 +318,7 @@ zcartoon_transform1 (GstBuffer * buf)
         gint j = 0;
         for(gint iY = y-top; j < m_mask_radius; ++j, ++iY){
 
-          n_pixelPos = (iY * i_height + iX) * 4; // neighbour pixel
+          n_pixelPos = (iY * i_width + iX) * 4; // neighbour pixel
           sumR += o_data[n_pixelPos + 2];
           sumB += o_data[n_pixelPos + 0];
           sumG += o_data[n_pixelPos + 1];
