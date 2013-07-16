@@ -363,7 +363,7 @@ zcartoon_transform_cpu (GstBuffer * buf)
   gst_buffer_unref (o_buf);
 }
 
-extern void zcartoon_transform( guint8 *data, guint8 *o_data, gint width, gint height );
+extern void zcartoon_transform( guint8 *data, gint width, gint height );
 //extern int test( gint len );
 
 /* chain function
@@ -395,15 +395,11 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
     str = gst_caps_get_structure (caps, 0);
     gst_structure_get_int (str, "width", &i_width);
     gst_structure_get_int (str, "height", &i_height);
-    g_print("Video size %d x %d\n", i_width, i_height);
+    //g_print("Video size %d x %d\n", i_width, i_height);
 
     data = GST_BUFFER_DATA (buf);
 
-    // copy buf to o_buf
-    o_buf = gst_buffer_copy (buf);
-    o_data = GST_BUFFER_DATA (o_buf);
-
-    zcartoon_transform ( data, o_data, i_width, i_height );
+    zcartoon_transform ( data, i_width, i_height );
     //test( len );
 
   /* just push out the incoming buffer without touching it */

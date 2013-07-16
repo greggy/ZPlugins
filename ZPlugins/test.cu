@@ -63,7 +63,7 @@ __global__ void transform(
 
 }
 
-void zcartoon_transform( guint8 *data, guint8 *o_data, int i_width, int i_height ){
+void zcartoon_transform( guint8 *data, int i_width, int i_height ){
     guint8 *d_data;
     guint8 *do_data;
     int m_mask_radius = 7;
@@ -73,11 +73,13 @@ void zcartoon_transform( guint8 *data, guint8 *o_data, int i_width, int i_height
 
     //printf ("Image length %d", len);
 
-    //int center = m_mask_radius / 2 + 1,
-            //width = i_width - center,
-            //height = i_height - center,
+    double m_size = m_mask_radius * m_mask_radius;
     int top = m_mask_radius / 2;
 
+    cudaEvent_t     start, stop;
+    cudaEventCreate( &start );
+    cudaEventCreate( &stop );
+    cudaEventRecord( start, 0 );
 
     checkCudaErrors( cudaMalloc( (void**)&d_data, size ) );
     checkCudaErrors( cudaMalloc( (void**)&do_data, size ) );
@@ -87,24 +89,19 @@ void zcartoon_transform( guint8 *data, guint8 *o_data, int i_width, int i_height
     dim3 threads = dim3(8, 8);
     dim3 blocks = dim3(i_width / threads.x, i_height / threads.y);
 
-    double m_size = m_mask_radius * m_mask_radius;
-
     // execute kernel
     transform<<< blocks, threads >>>( d_data, do_data, i_width, top, m_mask_radius, m_threshold, m_ramp, m_size );
 
     checkCudaErrors( cudaMemcpy( data, d_data, size, cudaMemcpyDeviceToHost ) );
 
-//    for (int i = 0; i < width * height; i++){
-//        int b = data[i + 0];
-//        int g = data[i + 1];
-//        int r = data[i + 2];
-//        if (b > 0 || g > 0 || r > 0)
-//            printf ("%d, %d, %d\n", b, g, r);
-//    }
+    cudaEventRecord( stop, 0 );
+    cudaEventSynchronize( stop );
+    float   elapsedTime;
+    cudaEventElapsedTime( &elapsedTime, start, stop );
+    printf("Frame was proccessed during: %f\n", elapsedTime);
 
     cudaFree( d_data );
     cudaFree( do_data );
-    free( o_data );
 }
 
 
