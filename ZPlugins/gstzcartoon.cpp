@@ -60,6 +60,7 @@
 #  include <config.h>
 #endif
 
+#include <cuda.h>
 #include <sys/param.h>
 #include <gst/gst.h>
 #include <gst/video/video.h>
@@ -69,7 +70,6 @@
 GST_DEBUG_CATEGORY_STATIC (gst_zcartoon_debug);
 #define GST_CAT_DEFAULT gst_zcartoon_debug
 
-#define qMin(a,b) (((a)<(b))?(a):(b))
 
 /* Filter signals and args */
 enum
@@ -270,7 +270,7 @@ mytransform (GstBuffer * buf)
  */
 
 static void
-zcartoon_transform1 (GstBuffer * buf)
+zcartoon_transform_cpu (GstBuffer * buf)
 {
   gint i_width, i_height;
   GstCaps * caps;
@@ -360,8 +360,11 @@ zcartoon_transform1 (GstBuffer * buf)
 
   /* Free the buffer */
   //gst_buffer_unref (buf);
-  //gst_buffer_unref (o_buf);
+  gst_buffer_unref (o_buf);
 }
+
+extern void zcartoon_transform( guint8 *data, guint8 *o_data, gint width, gint height );
+//extern int test( gint len );
 
 /* chain function
  * this function does the actual processing
@@ -370,13 +373,38 @@ static GstFlowReturn
 gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
 {
   Gstzcartoon *filter;
+  gint i_width, i_height;
+  GstCaps *caps;
+  guint8 *data;
+  GstBuffer *o_buf;
+  guint8 *o_data;
+  glong size;
+  gint len;
 
   filter = GST_ZCARTOON (GST_OBJECT_PARENT (pad));
 
   if (filter->silent == FALSE)
     //g_print ("I'm plugged, therefore I'm in.\n");
     //mytransform (buf);
-    zcartoon_transform1 (buf);
+    //zcartoon_transform_cpu (buf);
+
+    caps = GST_BUFFER_CAPS(buf);
+
+    const GstStructure *str;
+
+    str = gst_caps_get_structure (caps, 0);
+    gst_structure_get_int (str, "width", &i_width);
+    gst_structure_get_int (str, "height", &i_height);
+    g_print("Video size %d x %d\n", i_width, i_height);
+
+    data = GST_BUFFER_DATA (buf);
+
+    // copy buf to o_buf
+    o_buf = gst_buffer_copy (buf);
+    o_data = GST_BUFFER_DATA (o_buf);
+
+    zcartoon_transform ( data, o_data, i_width, i_height );
+    //test( len );
 
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (filter->srcpad, buf);
