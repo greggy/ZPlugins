@@ -16,7 +16,8 @@ SOURCES += \
     gstzdenoiser.cpp \
     gstzcartoon2.cpp \
     gstzcartoon.cpp \
-    test.cu
+    test.cu \
+    zcartoon_transform.cu
 
 #SOURCES -= \
 #    gstzcartoon.cu

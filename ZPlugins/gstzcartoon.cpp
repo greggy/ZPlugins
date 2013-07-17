@@ -64,6 +64,7 @@
 #include <sys/param.h>
 #include <gst/gst.h>
 #include <gst/video/video.h>
+#include <glib.h>
 
 #include "gstzcartoon.h"
 
@@ -363,7 +364,12 @@ zcartoon_transform_cpu (GstBuffer * buf)
   gst_buffer_unref (o_buf);
 }
 
+
+guint64 RealTime = 0;
+gint NumberFrames = 0;
+
 extern void zcartoon_transform( guint8 *data, gint width, gint height );
+//extern void simple_transform( guint8 *data, gint width, gint height );
 //extern int test( gint len );
 
 /* chain function
@@ -384,6 +390,8 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
   filter = GST_ZCARTOON (GST_OBJECT_PARENT (pad));
 
   if (filter->silent == FALSE)
+    NumberFrames++;
+    RealTime = g_get_monotonic_time();
     //g_print ("I'm plugged, therefore I'm in.\n");
     //mytransform (buf);
     //zcartoon_transform_cpu (buf);
@@ -400,7 +408,15 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
     data = GST_BUFFER_DATA (buf);
 
     zcartoon_transform ( data, i_width, i_height );
+    //simple_transform ( data, i_width, i_height );
     //test( len );
+
+    if (NumberFrames % 100 == 0){
+        gfloat elapsedTime = (g_get_monotonic_time() - RealTime) / 1000.0; // milliseconds
+        g_print("Video with size %dx%d processed %f frames in second, about %f ms for frame.\n", i_width, i_height, 1000.0 / elapsedTime, elapsedTime);
+        //NumberFrames = 0;
+        RealTime = g_get_monotonic_time();
+    }
 
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (filter->srcpad, buf);
