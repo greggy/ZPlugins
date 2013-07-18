@@ -365,11 +365,12 @@ zcartoon_transform_cpu (GstBuffer * buf)
 }
 
 
-guint64 RealTime = 0;
+guint64 RealTime;
 gint NumberFrames = 0;
+gfloat ElapsedTimeSum = 0;
 
 extern void zcartoon_transform( guint8 *data, gint width, gint height );
-//extern void simple_transform( guint8 *data, gint width, gint height );
+extern void simple_transform( guint8 *data, gint width, gint height );
 //extern int test( gint len );
 
 /* chain function
@@ -379,7 +380,7 @@ static GstFlowReturn
 gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
 {
   Gstzcartoon *filter;
-  gint i_width, i_height;
+  gint width, height;
   GstCaps *caps;
   guint8 *data;
   GstBuffer *o_buf;
@@ -390,8 +391,6 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
   filter = GST_ZCARTOON (GST_OBJECT_PARENT (pad));
 
   if (filter->silent == FALSE)
-    NumberFrames++;
-    RealTime = g_get_monotonic_time();
     //g_print ("I'm plugged, therefore I'm in.\n");
     //mytransform (buf);
     //zcartoon_transform_cpu (buf);
@@ -401,21 +400,25 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
     const GstStructure *str;
 
     str = gst_caps_get_structure (caps, 0);
-    gst_structure_get_int (str, "width", &i_width);
-    gst_structure_get_int (str, "height", &i_height);
-    //g_print("Video size %d x %d\n", i_width, i_height);
+    gst_structure_get_int (str, "width", &width);
+    gst_structure_get_int (str, "height", &height);
+    //g_print("Video size %d x %d\n", width, height);
 
     data = GST_BUFFER_DATA (buf);
 
-    zcartoon_transform ( data, i_width, i_height );
-    //simple_transform ( data, i_width, i_height );
+    NumberFrames++;
+    RealTime = g_get_monotonic_time();
+
+    zcartoon_transform ( data, width, height );
+    //simple_transform ( data, width, height );
     //test( len );
 
+    gfloat ElapsedTime = (g_get_monotonic_time() - RealTime) / 1000.0; // milliseconds
+    ElapsedTimeSum += ElapsedTime;
     if (NumberFrames % 100 == 0){
-        gfloat elapsedTime = (g_get_monotonic_time() - RealTime) / 1000.0; // milliseconds
-        g_print("Video with size %dx%d processed %f frames in second, about %f ms for frame.\n", i_width, i_height, 1000.0 / elapsedTime, elapsedTime);
-        //NumberFrames = 0;
-        RealTime = g_get_monotonic_time();
+        g_print("Video with size %dx%d processed %f frames in second, about %f ms for frame.\n",
+                width, height, 1000.0 / (ElapsedTimeSum / 100.0), ElapsedTimeSum / 100.0);
+        ElapsedTimeSum = 0;
     }
 
   /* just push out the incoming buffer without touching it */

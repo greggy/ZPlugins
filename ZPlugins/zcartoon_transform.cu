@@ -4,11 +4,13 @@
 
 typedef unsigned char guint8;
 
+#define BLOCK_DIM 16
+
 
 __global__ void zcartoon_kernel(
         guint8 *data,
-        guint8 *o_data,
         int width,
+        int height,
         int top,
         int m_mask_radius,
         float m_threshold,
@@ -16,10 +18,19 @@ __global__ void zcartoon_kernel(
         float m_size
         )
     {
+
+    //__shared__ float temp[BLOCK_DIM][BLOCK_DIM];
+
     uint x = ((blockIdx.x * blockDim.x) + threadIdx.x);
     uint y = ((blockIdx.y * blockDim.y) + threadIdx.y);
 
     uint m_pixelPos = (y * width + x) * 4; // main pixel
+
+
+//    if (x < width && y < height)
+//        temp[x][y] = data[m_pixelPos];
+//    __syncthreads();
+
 
     // get neighbour pixels
     int i = 0;
@@ -30,9 +41,9 @@ __global__ void zcartoon_kernel(
       for(int iY = y-top; j < m_mask_radius; ++j, ++iY){
 
         uint n_pixelPos = (iY * width + iX) * 4; // neighbour pixel
-        sumR += o_data[n_pixelPos + 2];
-        sumB += o_data[n_pixelPos + 0];
-        sumG += o_data[n_pixelPos + 1];
+        sumR += data[n_pixelPos + 2];
+        sumB += data[n_pixelPos + 0];
+        sumG += data[n_pixelPos + 1];
       }
     }
 
@@ -40,9 +51,9 @@ __global__ void zcartoon_kernel(
     sumB /= m_size;
     sumG /= m_size;
 
-    float red = o_data[m_pixelPos + 2],
-           blue = o_data[m_pixelPos + 0],
-           green = o_data[m_pixelPos + 1];
+    float red = data[m_pixelPos + 2],
+           blue = data[m_pixelPos + 0],
+           green = data[m_pixelPos + 1];
 
     float koeffR = red / sumR,
            koeffB = blue / sumB,
@@ -63,33 +74,27 @@ __global__ void zcartoon_kernel(
 
 }
 
-void zcartoon_transform( guint8 *data, int i_width, int i_height ){
+void zcartoon_transform( guint8 *data, int width, int height ){
     guint8 *d_data;
-    guint8 *do_data;
     int m_mask_radius = 7;
     float m_threshold = 1.0;
     float m_ramp = 0.1;
-    size_t size = i_width * i_height * 4;
-
-    //printf ("Image length %d", len);
+    size_t size = width * height * 4;
 
     float m_size = m_mask_radius * m_mask_radius;
     int top = m_mask_radius / 2;
 
     checkCudaErrors( cudaMalloc( (void**)&d_data, size ) );
-    checkCudaErrors( cudaMalloc( (void**)&do_data, size ) );
     checkCudaErrors( cudaMemcpy( d_data, data, size, cudaMemcpyHostToDevice ) );
-    checkCudaErrors( cudaMemcpy( do_data, data, size, cudaMemcpyHostToDevice ) );
 
-    dim3 threads = dim3(8, 8);
-    dim3 blocks = dim3(i_width / threads.x, i_height / threads.y);
-    //printf("Blocks x: %d, y: %d\n", blocks.x, blocks.y);
+    dim3 threads = dim3(32, 32);
+    dim3 blocks = dim3(width / threads.x, height / threads.y);
+    //printf("Threads x: %d, y: %d; blocks x: %d, y: %d\n", threads.x, threads.y, blocks.x, blocks.y);
 
     // execute kernel
-    zcartoon_kernel<<< blocks, threads >>>( d_data, do_data, i_width, top, m_mask_radius, m_threshold, m_ramp, m_size );
+    zcartoon_kernel<<< blocks, threads >>>( d_data, width, height, top, m_mask_radius, m_threshold, m_ramp, m_size );
 
     checkCudaErrors( cudaMemcpy( data, d_data, size, cudaMemcpyDeviceToHost ) );
 
     cudaFree( d_data );
-    cudaFree( do_data );
 }
