@@ -21,10 +21,10 @@ __global__ void zcartoon_kernel(
 
     //__shared__ float temp[BLOCK_DIM][BLOCK_DIM];
 
-    uint x = ((blockIdx.x * blockDim.x) + threadIdx.x);
-    uint y = ((blockIdx.y * blockDim.y) + threadIdx.y);
+    int x = ((blockIdx.x * blockDim.x) + threadIdx.x);
+    int y = ((blockIdx.y * blockDim.y) + threadIdx.y);
 
-    uint m_pixelPos = (y * width + x) * 4; // main pixel
+    int m_pixelPos = (y * width + x) * 4; // main pixel
 
 
 //    if (x < width && y < height)
@@ -34,7 +34,7 @@ __global__ void zcartoon_kernel(
 
     // get neighbour pixels
     int i = 0;
-    float sumR = 0, sumB = 0, sumG = 0;
+    int sumR = 0, sumB = 0, sumG = 0;
     for(int iX = x-top; i < m_mask_radius; ++i, ++iX){
 
       int j = 0;
@@ -51,11 +51,11 @@ __global__ void zcartoon_kernel(
     sumB /= m_size;
     sumG /= m_size;
 
-    float red = data[m_pixelPos + 2],
+    int red = data[m_pixelPos + 2],
            blue = data[m_pixelPos + 0],
            green = data[m_pixelPos + 1];
 
-    float koeffR = red / sumR,
+    int koeffR = red / sumR,
            koeffB = blue / sumB,
            koeffG = green / sumG;
 
