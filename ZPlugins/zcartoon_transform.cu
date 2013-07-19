@@ -4,8 +4,6 @@
 
 typedef unsigned char guint8;
 
-#define BLOCK_DIM 16
-
 
 __global__ void zcartoon_kernel(
         guint8 *data,
@@ -19,18 +17,10 @@ __global__ void zcartoon_kernel(
         )
     {
 
-    //__shared__ float temp[BLOCK_DIM][BLOCK_DIM];
-
     int x = ((blockIdx.x * blockDim.x) + threadIdx.x);
     int y = ((blockIdx.y * blockDim.y) + threadIdx.y);
 
     int m_pixelPos = (y * width + x) * 4; // main pixel
-
-
-//    if (x < width && y < height)
-//        temp[x][y] = data[m_pixelPos];
-//    __syncthreads();
-
 
     // get neighbour pixels
     int i = 0;
@@ -40,24 +30,20 @@ __global__ void zcartoon_kernel(
       int j = 0;
       for(int iY = y-top; j < m_mask_radius; ++j, ++iY){
 
-        uint n_pixelPos = (iY * width + iX) * 4; // neighbour pixel
+        int n_pixelPos = (iY * width + iX) * 4; // neighbour pixel
         sumR += data[n_pixelPos + 2];
         sumB += data[n_pixelPos + 0];
         sumG += data[n_pixelPos + 1];
       }
     }
 
-    sumR /= m_size;
-    sumB /= m_size;
-    sumG /= m_size;
-
-    int red = data[m_pixelPos + 2],
+    float red = data[m_pixelPos + 2],
            blue = data[m_pixelPos + 0],
            green = data[m_pixelPos + 1];
 
-    int koeffR = red / sumR,
-           koeffB = blue / sumB,
-           koeffG = green / sumG;
+    float koeffR = red / (sumR / m_size),
+           koeffB = blue / (sumB / m_size),
+           koeffG = green / (sumG / m_size);
 
     if(koeffR < m_threshold)
         red *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffR)))/m_ramp);
