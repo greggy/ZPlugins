@@ -4,8 +4,7 @@
 #include "utils.h"
 #include "vector_types.h"
 
-#include <cutil_inline.h>
-#include <cutil_math.h>
+#include <helper_math.h>
 
 
 typedef unsigned char guint8;
@@ -145,9 +144,21 @@ __global__ void zcartoon2_kernel(
 }
 
 
+texture<uchar4, 2, cudaReadModeNormalizedFloat> rgbaTex;
+cudaArray *d_data;
+
+// convert floating point rgba color to 32-bit integer
+__device__ uint rgbaFloatToInt(float4 rgba)
+{
+    rgba.x = __saturatef(fabs(rgba.x));   // clamp to [0.0, 1.0]
+    rgba.y = __saturatef(fabs(rgba.y));
+    rgba.z = __saturatef(fabs(rgba.z));
+    rgba.w = __saturatef(fabs(rgba.w));
+    return (uint(rgba.w * 255.0f) << 24) | (uint(rgba.z * 255.0f) << 16) | (uint(rgba.y * 255.0f) << 8) | uint(rgba.x * 255.0f);
+}
+
 // kernel with texture memory
 __global__ void zcartoon3_kernel(
-        guint8 *data,
         guint8 *o_data,
         int width,
         int height,
@@ -182,29 +193,25 @@ __global__ void zcartoon3_kernel(
 
     float4 koeff = pixel / blurPixel;
 
-
-    // red
-    if(koeff.z < m_threshold)
-        pixel.z *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffR)))/m_ramp);
-
     // blue
     if(koeff.x < m_threshold)
-        pixel.x *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffB)))/m_ramp);
+        pixel.x *= ((m_ramp - MIN(m_ramp,(m_threshold - koeff.x)))/m_ramp);
 
     // green
     if(koeff.y < m_threshold)
-        koeff.y *= ((m_ramp - MIN(m_ramp,(m_threshold - koeffG)))/m_ramp);
+        pixel.y *= ((m_ramp - MIN(m_ramp,(m_threshold - koeff.y)))/m_ramp);
 
-    o_data[pixelPos + 0] = pixel.x;
-    o_data[pixelPos + 1] = pixel.y;
-    o_data[pixelPos + 2] = pixel.z;
-    o_data[pixelPos + 3] = pixel.w;
+    // red
+    if(koeff.z < m_threshold)
+        pixel.z *= ((m_ramp - MIN(m_ramp,(m_threshold - koeff.z)))/m_ramp);
+
+    int pixelPos = (y * width + x);
+    o_data[pixelPos] = rgbaFloatToInt(pixel);
 
 }
 
 
 void zcartoon_transform( guint8 *data, int width, int height ){
-    guint8 *d_data;
     guint8 *o_data;
     int m_mask_radius = 7;
     float m_threshold = 1.0;
@@ -235,19 +242,31 @@ void zcartoon_transform( guint8 *data, int width, int height ){
     // for texture memory
     // copy image data to array
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
-    checkCudaErrors( cudaMallocArray  ( &d_data, &channelDesc, width, height ));
-    checkCudaErrors( cudaMallocArray  ( &o_data, &channelDesc, width, height ));
+    checkCudaErrors( cudaMallocArray ( &d_data, &channelDesc, width, height ));
+    checkCudaErrors( cudaMalloc ( (void**)&o_data, size ));
     checkCudaErrors( cudaMemcpyToArray( d_data, 0, 0, data, size, cudaMemcpyHostToDevice));
+
+    // normalization false
+    rgbaTex.addressMode[0] = cudaAddressModeWrap; // режим Wrap
+    rgbaTex.addressMode[1] = cudaAddressModeWrap;
+    rgbaTex.filterMode =  cudaFilterModePoint;  // ближайшее значение
+    rgbaTex.normalized = false; // не использовать нормализованную адресацию
 
     checkCudaErrors( cudaBindTextureToArray(rgbaTex, d_data) );
 
     dim3 blocks = dim3((width + 16 - 1) / 16, (width + 16 - 1) / 16);
     dim3 threads = dim3(16, 16);
-    zcartoon3_kernel<<< blocks, threads>>>(d_data, o_data, width, height, top, m_mask_radius, m_threshold, m_ramp, m_size);
+    zcartoon3_kernel<<< blocks, threads>>>(o_data, width, height, top, m_mask_radius, m_threshold, m_ramp, m_size);
 
-    checkCudaErrors(cudaMemcpy(data, o_data, size, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(data, o_data, size, cudaMemcpyDeviceToHost));
+
+    for (int i = 0; i < width * height; i++)
+    {
+        printf("Blue: %d, green: %d, red: %d, alpha: %d\n", data[i], data[i+1], data[i+2], data[i+3]);
+    }
 
     checkCudaErrors(cudaFreeArray(d_data));
-    checkCudaErrors(cudaFreeArray(o_data));
+    checkCudaErrors(cudaFree(o_data));
+    checkCudaErrors(cudaUnbindTexture(rgbaTex));
 
 }

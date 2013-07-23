@@ -66,12 +66,14 @@ DESTDIR = $$PROJECT_DIR/../ZPlugins-build
 
 # Path to cuda toolkit install
 CUDA_DIR = /usr/lib/nvidia-cuda-toolkit
+CUDA_SDK = /usr/local/cuda-5.0/samples
 # GPU architecture
 CUDA_ARCH = sm_20
 # nvcc flags (ptxas option verbose is always useful)
 NVCCFLAGS = --compiler-options -fno-strict-aliasing -use_fast_math --ptxas-options=-v
 # include paths
 INCLUDEPATH += $$CUDA_DIR/include
+INCLUDEPATH += $$CUDA_SDK/common/inc
 # lib dirs
 QMAKE_LIBDIR += $$CUDA_DIR/lib
 
