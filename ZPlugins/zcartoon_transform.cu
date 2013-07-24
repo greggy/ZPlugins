@@ -173,7 +173,7 @@ __global__ void zcartoon3_kernel(
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
     float4 blurPixel = make_float4(0.0f);
-    float koeffCore = float(m_ramp);
+    float koeffCore = float(m_mask_radius);
 
     // get neighbour pixels
     int i = 0;
@@ -205,8 +205,10 @@ __global__ void zcartoon3_kernel(
     if(koeff.z < m_threshold)
         pixel.z *= ((m_ramp - MIN(m_ramp,(m_threshold - koeff.z)))/m_ramp);
 
-    int pixelPos = (y * width + x);
-    o_data[pixelPos] = rgbaFloatToInt(pixel);
+
+    int pixelPos = (y * width + x) * 4;
+    uint tmp = rgbaFloatToInt(pixel);
+    memcpy(&o_data[pixelPos], &tmp, sizeof(tmp));
 
 }
 
@@ -243,7 +245,7 @@ void zcartoon_transform( guint8 *data, int width, int height ){
     // copy image data to array
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
     checkCudaErrors( cudaMallocArray ( &d_data, &channelDesc, width, height ));
-    checkCudaErrors( cudaMalloc ( (void**)&o_data, size ));
+    checkCudaErrors( cudaMalloc( &o_data, size ));
     checkCudaErrors( cudaMemcpyToArray( d_data, 0, 0, data, size, cudaMemcpyHostToDevice));
 
     // normalization false
@@ -254,16 +256,17 @@ void zcartoon_transform( guint8 *data, int width, int height ){
 
     checkCudaErrors( cudaBindTextureToArray(rgbaTex, d_data) );
 
-    dim3 blocks = dim3((width + 16 - 1) / 16, (width + 16 - 1) / 16);
-    dim3 threads = dim3(16, 16);
-    zcartoon3_kernel<<< blocks, threads>>>(o_data, width, height, top, m_mask_radius, m_threshold, m_ramp, m_size);
+    dim3 threads = dim3(32, 32, 1);
+    dim3 blocks = dim3(width / threads.x, height / threads.y, 1);
+
+    zcartoon3_kernel<<< blocks, threads >>>(o_data, width, height, top, m_mask_radius, m_threshold, m_ramp, m_size);
 
     checkCudaErrors(cudaMemcpy(data, o_data, size, cudaMemcpyDeviceToHost));
 
-    for (int i = 0; i < width * height; i++)
-    {
-        printf("Blue: %d, green: %d, red: %d, alpha: %d\n", data[i], data[i+1], data[i+2], data[i+3]);
-    }
+//    for (int i = 0; i < width * height; i++)
+//    {
+//        printf("Blue: %d, green: %d, red: %d, alpha: %d\n", data[i], data[i+1], data[i+2], data[i+3]);
+//    }
 
     checkCudaErrors(cudaFreeArray(d_data));
     checkCudaErrors(cudaFree(o_data));
