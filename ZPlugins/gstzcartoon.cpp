@@ -369,7 +369,9 @@ guint64 RealTime;
 gint NumberFrames = 0;
 gfloat ElapsedTimeSum = 0;
 
-extern void zcartoon_transform( guint8 *data, gint width, gint height );
+extern void zcartoon1_transform( guint8 *data, gint width, gint height );
+extern void zcartoon2_transform( guint8 *data, gint width, gint height );
+extern void zcartoon3_transform( guint8 *data, gint width, gint height );
 extern void simple_transform( guint8 *data, gint width, gint height );
 //extern int test( gint len );
 
@@ -409,7 +411,9 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
     NumberFrames++;
     RealTime = g_get_monotonic_time();
 
-    zcartoon_transform ( data, width, height );
+    //zcartoon1_transform ( data, width, height );
+    //zcartoon2_transform ( data, width, height );
+    zcartoon3_transform ( data, width, height );
     //simple_transform ( data, width, height );
     //test( len );
 
