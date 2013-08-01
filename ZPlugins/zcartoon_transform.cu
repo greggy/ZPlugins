@@ -243,16 +243,6 @@ void zcartoon2_transform( guint8 *data, int width, int height ){
  *  kernel with texture memory
  *
  **************************************/
-__device__ float2 getNCoords(int x, int y, int height, int width, int offset)
-{
-    if(height > x + offset)
-    {
-        return (float2){x + offset, y};
-    } else {
-        int yoffset = (x + offset) / width;
-        return (float2){(x + offset) % width, y + yoffset};
-    }
-}
 
 texture<uchar4, 2, cudaReadModeNormalizedFloat> rgbaTex;
 cudaArray *d_data;
@@ -388,15 +378,13 @@ __global__ void zcartoon4_kernel(
         {
             for(int j = -top; j <= top; j++)
             {
-                float2 npixel = getNCoords((i + x), (j + y), height, width, a);
-                float4 nPix = tex2D(rgbaTex, npixel.x, npixel.y);
+                float4 nPix = tex2D(rgbaTex, (i + x + a), (j + y));
                 blurPixel += nPix;
             }
         }
 
         // get main pixel
-        float2 mcoords = getNCoords(x, y, height, width, a);
-        float4 pixel = tex2D(rgbaTex, mcoords.x, mcoords.y);
+        float4 pixel = tex2D(rgbaTex, (x + a), y);
         //pixel.z = 0;
         blurPixel /= (koeffCore*koeffCore);
 
