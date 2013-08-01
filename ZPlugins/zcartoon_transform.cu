@@ -11,6 +11,7 @@ typedef unsigned char guint8;
 
 #define BLOCK_DIM 16
 #define GROUP_SIZE 5
+#define BLOCK_SIZE 64
 
 
 // convert floating point rgba color to 32-bit integer
@@ -371,12 +372,10 @@ __global__ void zcartoon4_kernel(
         float m_size
     )
 {
-    int x = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
-    int y = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    int x = blockIdx.x * BLOCK_SIZE * GROUP_SIZE + threadIdx.x * GROUP_SIZE;
+    int y = blockIdx.y;
 
-    int pixelId = (y * width + x);
-
-    if(pixelId % GROUP_SIZE != 0)
+    if(x > width || y > height)
         return;
 
     for(int a = 0; a < GROUP_SIZE; a++){
@@ -416,7 +415,7 @@ __global__ void zcartoon4_kernel(
             pixel.z *= ((m_ramp - MIN(m_ramp,(m_threshold - koeff.z)))/m_ramp);
 
         uint tmp = rgbaFloatToInt(pixel);
-        int pixelPos = pixelId * 4 + (a * 4);
+        int pixelPos = (y * width + x) * 4 + (a * 4);
         memcpy(&o_data[pixelPos], &tmp, sizeof(tmp));
 
     }
@@ -446,8 +445,8 @@ void zcartoon4_transform( guint8 *data, int width, int height ){
 
     checkCudaErrors( cudaBindTextureToArray(rgbaTex, d_data) );
 
-    dim3 threads = dim3(BLOCK_DIM, BLOCK_DIM, 1);
-    dim3 blocks = dim3(width / threads.x, height / threads.y);
+    dim3 threads = dim3(BLOCK_SIZE, 1, 1);
+    dim3 blocks = dim3(width / (threads.x * GROUP_SIZE) + 1, height);
 
     zcartoon4_kernel<<< blocks, threads >>>(o_data, width, height, top, m_mask_radius, m_threshold, m_ramp, m_size);
 
