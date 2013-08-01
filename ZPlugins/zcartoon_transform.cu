@@ -10,8 +10,8 @@
 typedef unsigned char guint8;
 
 #define BLOCK_DIM 16
-#define GROUP_SIZE 5
-#define BLOCK_SIZE 64
+#define GROUP_SIZE 22
+#define BLOCK_SIZE 16*16
 
 
 // convert floating point rgba color to 32-bit integer
@@ -368,6 +368,8 @@ __global__ void zcartoon4_kernel(
     if(x > width || y > height)
         return;
 
+    uint tmp;
+
     for(int a = 0; a < GROUP_SIZE; a++){
 
         float4 blurPixel = make_float4(0.0f);
@@ -385,7 +387,6 @@ __global__ void zcartoon4_kernel(
 
         // get main pixel
         float4 pixel = tex2D(rgbaTex, (x + a), y);
-        //pixel.z = 0;
         blurPixel /= (koeffCore*koeffCore);
 
         float4 koeff = pixel / blurPixel;
@@ -402,10 +403,9 @@ __global__ void zcartoon4_kernel(
         if(koeff.z < m_threshold)
             pixel.z *= ((m_ramp - MIN(m_ramp,(m_threshold - koeff.z)))/m_ramp);
 
-        uint tmp = rgbaFloatToInt(pixel);
+        tmp = rgbaFloatToInt(pixel);
         int pixelPos = (y * width + x) * 4 + (a * 4);
         memcpy(&o_data[pixelPos], &tmp, sizeof(tmp));
-
     }
 }
 
