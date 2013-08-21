@@ -61,6 +61,8 @@
 #endif
 
 #include <gst/gst.h>
+#include <gst/video/video.h>
+#include <glib.h>
 
 #include "gstzcartoon2.h"
 
@@ -87,7 +89,7 @@ enum
 static GstStaticPadTemplate sink_factory = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS ("ANY")
+    GST_STATIC_CAPS( GST_VIDEO_CAPS_BGRA )
     );
 
 static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
@@ -218,6 +220,13 @@ gst_zcartoon2_set_caps (GstPad * pad, GstCaps * caps)
   return gst_pad_set_caps (otherpad, caps);
 }
 
+
+guint64 RealTime2;
+gint NumberFrames2 = 0;
+gfloat ElapsedTimeSum2 = 0;
+
+extern void bilateral_transform( guint8 *data, gint width, gint height );
+
 /* chain function
  * this function does the actual processing
  */
@@ -225,11 +234,36 @@ static GstFlowReturn
 gst_zcartoon2_chain (GstPad * pad, GstBuffer * buf)
 {
   Gstzcartoon2 *filter;
+  gint width, height;
+  GstCaps *caps;
+  guint8 *data;
 
   filter = GST_ZCARTOON2 (GST_OBJECT_PARENT (pad));
 
   if (filter->silent == FALSE)
-    g_print ("I'm plugged, therefore I'm in.\n");
+    //g_print ("I'm plugged, therefore I'm in.\n");
+    caps = GST_BUFFER_CAPS(buf);
+
+    const GstStructure *str;
+
+    str = gst_caps_get_structure (caps, 0);
+    gst_structure_get_int (str, "width", &width);
+    gst_structure_get_int (str, "height", &height);
+
+    data = GST_BUFFER_DATA (buf);
+
+    NumberFrames2++;
+    RealTime2 = g_get_monotonic_time();
+
+    bilateral_transform ( data, width, height );
+
+    gfloat ElapsedTime2 = (g_get_monotonic_time() - RealTime2) / 1000.0; // milliseconds
+    ElapsedTimeSum2 += ElapsedTime2;
+    if (NumberFrames2 % 100 == 0){
+      g_print("Video with size %dx%d processed %f frames in second, about %f ms for frame.\n",
+              width, height, 1000.0 / (ElapsedTimeSum2 / 100.0), ElapsedTimeSum2 / 100.0);
+      ElapsedTimeSum2 = 0;
+    }
 
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (filter->srcpad, buf);

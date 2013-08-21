@@ -376,6 +376,7 @@ extern void zcartoon4_transform( guint8 *data, gint width, gint height );
 extern void simple_transform( guint8 *data, gint width, gint height );
 extern void boxfilter1_transform( guint8 *data, gint width, gint height );
 extern void boxfilter2_transform( guint8 *data, gint width, gint height );
+extern void bilateral_transform( guint8 *data, gint width, gint height );
 //extern int test( gint len );
 
 /* chain function

@@ -32,14 +32,14 @@ void boxfilter1_transform( Npp8u *data, int width, int height ){
     Npp32s hostKernel[9] = {1, 1, 1, 1, 11, 1, 1, 1, 1};
     Npp32s *pKernel;
 
-    checkCudaErrors( cudaMalloc((void**)&pKernel, 3 * 3 * sizeof(Npp32s)) );
-    checkCudaErrors( cudaMemcpy(pKernel, hostKernel, 3 * 3 * sizeof(Npp32s),
+    checkCudaErrors( cudaMalloc((void**)&pKernel, oMaskSize.width * oMaskSize.height * sizeof(Npp32s)) );
+    checkCudaErrors( cudaMemcpy(pKernel, hostKernel, oMaskSize.width * oMaskSize.height * sizeof(Npp32s),
                                 cudaMemcpyHostToDevice) );
 
     Npp32s nDivisor = 9;
 
     // create struct with ROI size given the current mask
-    NppiSize oSizeROI = {oDeviceSrc.width() - 3 + 1, oDeviceSrc.height() - 3 + 1};
+    NppiSize oSizeROI = {oDeviceSrc.width() - oMaskSize.width + 1, oDeviceSrc.height() - oMaskSize.height + 1};
     // allocate device image of appropriatedly reduced size
     npp::ImageNPP_8u_C4 oDeviceDst(oSizeROI.width, oSizeROI.height);
     // set anchor point inside the mask
