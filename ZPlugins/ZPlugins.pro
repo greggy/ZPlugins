@@ -17,7 +17,8 @@ SOURCES += \
     gstzcartoon2.cpp \
     gstzcartoon.cpp \
     test.cu \
-    zcartoon_transform.cu
+    zcartoon_transform.cu \
+    npp_filters.cpp
 
 #SOURCES -= \
 #    gstzcartoon.cu

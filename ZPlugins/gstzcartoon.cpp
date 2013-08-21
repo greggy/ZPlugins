@@ -374,6 +374,8 @@ extern void zcartoon2_transform( guint8 *data, gint width, gint height );
 extern void zcartoon3_transform( guint8 *data, gint width, gint height );
 extern void zcartoon4_transform( guint8 *data, gint width, gint height );
 extern void simple_transform( guint8 *data, gint width, gint height );
+extern void boxfilter1_transform( guint8 *data, gint width, gint height );
+extern void boxfilter2_transform( guint8 *data, gint width, gint height );
 //extern int test( gint len );
 
 /* chain function
@@ -415,7 +417,9 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
     //zcartoon1_transform ( data, width, height );
     //zcartoon2_transform ( data, width, height );
     //zcartoon3_transform ( data, width, height );
-    zcartoon4_transform ( data, width, height );
+    //zcartoon4_transform ( data, width, height );
+    boxfilter1_transform ( data, width, height );
+    //boxfilter2_transform ( data, width, height );
     //simple_transform ( data, width, height );
     //test( len );
 
@@ -430,4 +434,3 @@ gst_zcartoon_chain (GstPad * pad, GstBuffer * buf)
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (filter->srcpad, buf);
 }
-
