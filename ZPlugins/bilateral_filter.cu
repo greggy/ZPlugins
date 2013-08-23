@@ -103,7 +103,7 @@ void bilateral_transform( guint8 *data, int width, int height ){
     float gaussian_delta = 4;
     float e_d = 0.1f;
     int radius = 5;
-    int iterations = 5;
+    int iterations = 3;
     size_t size = width * height * 4;
 
     updateGaussian(gaussian_delta, radius);
@@ -114,7 +114,6 @@ void bilateral_transform( guint8 *data, int width, int height ){
     checkCudaErrors(cudaMalloc(&d_data, size));
     checkCudaErrors(cudaMemcpy2D(dImage, pitch, data, sizeof(guint8) * width * 4,
                                  sizeof(guint8) * width * 4, height, cudaMemcpyHostToDevice));
-    //printf("Pitch: %d\n", pitch);
 
     // bind array to texture
     cudaChannelFormatDesc desc = cudaCreateChannelDesc<uchar4>();

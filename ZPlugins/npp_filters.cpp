@@ -29,14 +29,14 @@ void boxfilter1_transform( Npp8u *data, int width, int height ){
     NppiSize oMaskSize = {3, 3};
 
     // Allocate memory for pKernel
-    Npp32s hostKernel[9] = {1, 1, 1, 1, 11, 1, 1, 1, 1};
+    Npp32s hostKernel[9] = {0, 0, -2, 0, 2, 0, 1, 0, 0}; // reverse order
     Npp32s *pKernel;
 
     checkCudaErrors( cudaMalloc((void**)&pKernel, oMaskSize.width * oMaskSize.height * sizeof(Npp32s)) );
     checkCudaErrors( cudaMemcpy(pKernel, hostKernel, oMaskSize.width * oMaskSize.height * sizeof(Npp32s),
                                 cudaMemcpyHostToDevice) );
 
-    Npp32s nDivisor = 9;
+    Npp32s nDivisor = 1;
 
     // create struct with ROI size given the current mask
     NppiSize oSizeROI = {oDeviceSrc.width() - oMaskSize.width + 1, oDeviceSrc.height() - oMaskSize.height + 1};
