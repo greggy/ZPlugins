@@ -19,7 +19,9 @@ SOURCES += \
     test.cu \
     zcartoon_transform.cu \
     npp_filters.cpp \
-    bilateral_filter.cu
+    bilateral_filter.cu \
+    gstzchroma.cpp \
+    zchroma_transform.cu
 
 #SOURCES -= \
 #    gstzcartoon.cu
@@ -28,7 +30,8 @@ HEADERS +=\
     gstzdenoiser.h \
     gstzcartoon2.h \
     gstzcartoon.h \
-    utils.h
+    utils.h \
+    gstzchroma.h
 
 symbian {
     MMP_RULES += EXPORTUNFROZEN

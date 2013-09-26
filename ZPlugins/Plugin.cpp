@@ -3,6 +3,7 @@
 #include "gstzcartoon.h"
 #include "gstzcartoon2.h"
 #include "gstzdenoiser.h"
+#include "gstzchroma.h"
 
 /* entry point to initialize the plug-in
  * initialize the plug-in itself
@@ -18,7 +19,8 @@ plugin_init (GstPlugin * plugin)
   
 	if (!gst_element_register (plugin, "zcartoon", GST_RANK_NONE, GST_TYPE_ZCARTOON) ||
 		!gst_element_register (plugin, "zcartoon2", GST_RANK_NONE, GST_TYPE_ZCARTOON2) ||
-		! gst_element_register (plugin, "zdenoiser", GST_RANK_NONE, GST_TYPE_ZDENOISER)		
+		!gst_element_register (plugin, "zdenoiser", GST_RANK_NONE, GST_TYPE_ZDENOISER) ||
+        !gst_element_register (plugin, "zchroma", GST_RANK_NONE, GST_TYPE_ZCHROMA)
 		){
 		return FALSE;
 	}
