@@ -63,6 +63,7 @@
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <glib.h>
+#include <math.h>
 
 #include "gstzchroma.h"
 
@@ -220,10 +221,37 @@ gst_zchroma_set_caps (GstPad * pad, GstCaps * caps)
   return gst_pad_set_caps (otherpad, caps);
 }
 
+
+// http://www.swageroo.com/wordpress/how-to-program-a-gaussian-blur-without-using-3rd-party-libraries/
+void gaussianWeights(const float sigma, int filterWidth, float **filter)
+{
+    int center = filterWidth / 2;
+    int i = 0;
+    *filter = new float[filterWidth * filterWidth];
+
+    for (int a = -center; a <= center; a++)
+    {
+        for (int b = -center; b <= center; b++)
+        {
+            int x = abs(a);
+            int y = abs(b);
+            (*filter)[i] = 1.0f / (2.0f * M_PI * pow(sigma, 2)) * expf(-((pow(x, 2) + pow(y, 2)) / (2.0f * pow(sigma, 2))));
+            i++;
+        }
+    }
+
+    return;
+}
+
+
+guint64 RealTime3;
+gint NumberFrames3 = 0;
+gfloat ElapsedTimeSum3 = 0;
+
 /* chain function
  * this function does the actual processing
  */
-extern void zchroma_transform( guint8 *data, gint width, gint height );
+extern void zchroma_transform( guint8 *data, gint width, gint height, gint filterWidth, float *d_filter );
 
 static GstFlowReturn
 gst_zchroma_chain (GstPad * pad, GstBuffer * buf)
@@ -232,6 +260,9 @@ gst_zchroma_chain (GstPad * pad, GstBuffer * buf)
   gint width, height;
   GstCaps *caps;
   guint8 *data;
+  int filterWidth = 3;
+  const float sigma = 1.5;
+  float *d_filter;
 
   filter = GST_ZCHROMA (GST_OBJECT_PARENT (pad));
 
@@ -249,7 +280,20 @@ gst_zchroma_chain (GstPad * pad, GstBuffer * buf)
 
     data = GST_BUFFER_DATA (buf);
 
-  zchroma_transform( data, width, height );
+  gaussianWeights( sigma, filterWidth, &d_filter );
+
+  NumberFrames3++;
+  RealTime3 = g_get_monotonic_time();
+
+  zchroma_transform( data, width, height, filterWidth, d_filter );
+
+  gfloat ElapsedTime3 = (g_get_monotonic_time() - RealTime3) / 1000.0; // milliseconds
+  ElapsedTimeSum3 += ElapsedTime3;
+  if (NumberFrames3 % 100 == 0){
+    g_print("Video with size %dx%d processed %f frames in second, about %f ms for frame.\n",
+            width, height, 1000.0 / (ElapsedTimeSum3 / 100.0), ElapsedTimeSum3 / 100.0);
+    ElapsedTimeSum3 = 0;
+  }
 
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (filter->srcpad, buf);
